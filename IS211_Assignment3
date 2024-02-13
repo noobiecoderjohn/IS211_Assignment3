@@ -1,0 +1,55 @@
+import argparse
+import csv
+import re
+from collections import Counter
+from datetime import datetime
+import requests
+
+def download_log_file(url, filename):
+    response = requests.get(url)
+    if response.status_code == 200:
+        with open("weblog.csv", "wb") as file:
+            file.write(response.content)
+    else:
+        print(f"Failed to download the log file: {e}")
+
+def process_log_file(filename):
+    image_hits = []
+    browsers = Counter()
+    hour_hits = Counter()
+
+    image_pattern = re.compile(r'\.(jpg|jpeg|png|gif)$', re.IGNORECASE)
+
+    with open(filename, newline='') as csvfile:
+        csvreader = csv.reader(csvfile)
+        for row in csvreader:
+            path, datetime_accessed, user_agent, status, size = row
+            if image_pattern.search(path):
+                image_hits.append(row)
+            browser_match = re.search(r'(Firefox|Chrome|MSIE|Safari)', user_agent)
+            if browser_match:
+                browsers[browser_match.group()] += 1
+            access_time = datetime.strptime(datetime_accessed, '%m/%d/%Y %H:%M:%S')
+            hour_hits[access_time.hour] += 1
+
+    total_hits = len(image_hits) + sum(browsers.values())
+    image_hits_percentage = (len(image_hits) / total_hits) * 100
+    print(f"Image requests account for {image_hits_percentage:.1f}% of all requests")
+
+    most_popular_browser = browsers.most_common(1)[0][0]
+    print(f"The most popular browser is {most_popular_browser}")
+
+    print("\nHits by Hour:")
+    for hour, hits in sorted(hour_hits.items()):
+        print(f"Hour {hour:02} has {hits} hits")
+
+def main(url, filename):
+    download_log_file(url, filename)
+    process_log_file(filename)
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--url", help="URL of the log file", type=str, required=True)
+    parser.add_argument("--filename", help="Filename to save the log file", type=str, default="log_file.csv")
+    args = parser.parse_args()
+    main(args.url, args.filename)
